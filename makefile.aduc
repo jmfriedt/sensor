@@ -1,0 +1,322 @@
+# WinARM template makefile 
+# by Martin Thomas, Kaiserslautern, Germany 
+# <eversmith@heizung-thomas.de>
+
+# MCU name and submodel
+MCU      = arm7tdmi
+SUBMDL   = ADuC7026
+THUMB    = # -mthumb
+
+## Create ROM-Image (final)
+RUN_MODE=ROM_RUN
+
+# Target file name (without extension).  ATTENTION a ne pas mettre d'espace a la fin
+TARGET = DDS
+# modbus_vers_pc
+# modbus_src_courant
+
+# List C source files here. (C dependencies are automatically generated.)
+SRC = $(TARGET).c at25.c eeprom.c DDSvar.c syscalls.c init_aduc.c racine/racine.c 
+
+ifeq ($(LCD),1)
+SRC += LCD_driver.c
+endif
+
+ifeq ($(MODBUS),1)
+#SRC += libmodbus-3.0.3/src/modbus.c libmodbus-3.0.3/src/modbus-data.c libmodbus-3.0.3/src/modbus-rtu.c
+SRC +=  ./freemodbus-v1.5.0senseor/modbus/mb.c ./freemodbus-v1.5.0senseor/modbus/rtu/mbrtu.c \
+        ./freemodbus-v1.5.0senseor/modbus/rtu/mbcrc.c ./freemodbus-v1.5.0senseor/modbus/functions/mbfunccoils.c \
+        ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncdiag.c ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncholding.c \
+        ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncinput.c ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncother.c \
+        ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncdisc.c ./freemodbus-v1.5.0senseor/modbus/functions/mbutils.c \
+        ./freemodbus-v1.5.0senseor/demo/ARM/portevent.c ./freemodbus-v1.5.0senseor/modbus/ascii/mbascii.c 
+endif
+
+# List C source files here which must be compiled in ARM-Mode.
+SRCARM = irq.c
+
+# List Assembler source files here which must be assembled in ARM-Mode..
+ASRCARM = startup.S   
+# modif jmfriedt : crt0.o par defaut ne marche pas
+
+## Output format. (can be ihex or binary)
+FORMAT = ihex
+
+# Optimization level, can be [0, 1, 2, 3, s]. 
+# 0 = turn off optimization. s = optimize for size.
+# (Note: 3 is not always the best optimization level. See avr-libc FAQ.)
+OPT = s
+#OPT = 3
+
+# List any extra directories to look for include files here.
+EXTRAINCDIRS = ./include
+
+# List any extra directories to look for library files here.
+EXTRA_LIBDIRS = 
+
+
+# Compiler flag to set the C Standard level.
+# gnu99 - c99 plus GCC extensions
+CSTANDARD = -std=gnu99
+
+# Place -D or -U options for C here
+CDEFS =  -D$(RUN_MODE) -Daduc
+ifeq ($(MODBUS),1)
+CDEFS += -DMODBUS
+endif
+
+# Place -I options here
+# CINCS = -I. -I./libmodbus-3.0.3/src/ -I./libmodbus-3.0.3/
+CINCS = -I. -I./freemodbus-v1.5.0senseor/modbus/rtu/  -I./freemodbus-v1.5.0senseor/modbus/ascii/  -I./freemodbus-v1.5.0senseor/modbus/include/ -I./freemodbus-v1.5.0senseor/demo/ARM
+
+
+# Place -D or -U options for ASM here
+ADEFS =  -D$(RUN_MODE)
+
+ifdef VECTOR_LOCATION
+CDEFS += -D$(VECTOR_LOCATION)
+ADEFS += -D$(VECTOR_LOCATION)
+endif
+
+# Compiler flags.
+#  -g*:          generate debugging information
+#  -O*:          optimization level
+#  -f...:        tuning, see GCC manual and avr-libc documentation
+#  -Wall...:     warning level
+#  -Wa,...:      tell GCC to pass this to the assembler.
+#    -adhlns...: create assembler listing
+#
+# Flags for C and C++ (arm-elf-gcc/arm-elf-g++)
+CFLAGS += $(CDEFS) $(CINCS)
+CFLAGS += -O$(OPT) 
+CFLAGS += -Wall -Wcast-align -Wimplicit 
+CFLAGS += -Wpointer-arith -Wswitch
+CFLAGS += -Wredundant-decls -Wreturn-type -Wshadow -Wunused
+CFLAGS += -Wa,-adhlns=$(subst $(suffix $<),.lst,$<) 
+CFLAGS += $(patsubst %,-I%,$(EXTRAINCDIRS))
+
+# flags only for C
+CONLYFLAGS += -Wnested-externs 
+CONLYFLAGS += $(CSTANDARD)
+
+CFLAGS += -Wcast-qual -fno-omit-frame-pointer
+CONLYFLAGS += -Wmissing-prototypes 
+CONLYFLAGS += -Wstrict-prototypes
+CONLYFLAGS += -Wmissing-declarations
+
+# flags only for C++ (arm-elf-g++)
+# CPPFLAGS = -fno-rtti -fno-exceptions
+CPPFLAGS = 
+
+# Assembler flags.
+#  -ahlms:    create listing
+ASFLAGS = $(ADEFS) -Wa,-adhlns=$(<:.S=.lst)
+
+
+# Extra libraries
+EXTRA_LIBS =
+
+MATH_LIB = -lm  # jmf
+
+# Linker flags.
+#  -Wl,...:     tell GCC to pass this to linker.
+#    -Map:      create map file
+#    --cref:    add cross reference to  map file
+
+LDFLAGS = -nostartfiles -Wl,-Map=$(TARGET).map,--cref
+#LDFLAGS = -Wl,-Map=$(TARGET).map,--cref
+
+LDFLAGS += $(NEWLIBLPC) $(MATH_LIB)
+LDFLAGS += $(CPLUSPLUS_LIB)
+LDFLAGS += $(patsubst %,-L%,$(EXTRA_LIBDIRS))
+LDFLAGS += $(patsubst %,-l%,$(EXTRA_LIBS))
+
+# Set Linker-Script Depending On Selected Memory and Controller
+ifeq ($(RUN_MODE),RAM_RUN)
+LDFLAGS +=-T$(SUBMDL)-RAM.ld
+else 
+LDFLAGS +=-T$(SUBMDL)-ROM.ld
+endif
+
+# Define programs and commands.
+SHELL = sh
+CC = arm-none-eabi-gcc
+CPP = arm-none-eabi-g++
+OBJCOPY = arm-none-eabi-objcopy
+OBJDUMP = arm-none-eabi-objdump
+SIZE = arm-none-eabi-size
+NM = arm-none-eabi-nm
+REMOVE = rm -f
+COPY = cp
+
+# Define Messages
+# English
+MSG_ERRORS_NONE = Errors: none
+MSG_BEGIN = "-------- begin (mode: $(RUN_MODE)) --------"
+MSG_END = --------  end  --------
+MSG_SIZE_BEFORE = Size before: 
+MSG_SIZE_AFTER = Size after:
+MSG_FLASH = Creating load file for Flash:
+MSG_EXTENDED_LISTING = Creating Extended Listing:
+MSG_SYMBOL_TABLE = Creating Symbol Table:
+MSG_LINKING = Linking:
+MSG_COMPILING = Compiling C:
+MSG_COMPILING_ARM = "Compiling C (ARM-only):"
+MSG_COMPILINGCPP = Compiling C++:
+MSG_COMPILINGCPP_ARM = "Compiling C++ (ARM-only):"
+MSG_ASSEMBLING = Assembling:
+MSG_ASSEMBLING_ARM = "Assembling (ARM-only):"
+MSG_CLEANING = Cleaning project:
+MSG_FORMATERROR = Can not handle output-format
+MSG_LPC21_RESETREMINDER = You may have to bring the target in bootloader-mode now.
+
+# Define all object files.
+COBJ      = $(SRC:.c=.o) 
+AOBJ      = $(ASRC:.S=.o)
+COBJARM   = $(SRCARM:.c=.o)
+AOBJARM   = $(ASRCARM:.S=.o)
+CPPOBJ    = $(CPPSRC:.cpp=.o) 
+CPPOBJARM = $(CPPSRCARM:.cpp=.o)
+
+# Define all listing files.
+LST = $(ASRC:.S=.lst) $(ASRCARM:.S=.lst) $(SRC:.c=.lst) $(SRCARM:.c=.lst)
+LST += $(CPPSRC:.cpp=.lst) $(CPPSRCARM:.cpp=.lst)
+
+# Compiler flags to generate dependency files.
+### GENDEPFLAGS = -Wp,-M,-MP,-MT,$(*F).o,-MF,.dep/$(@F).d
+# GENDEPFLAGS = -MD -MP -MF .dep/$(@F).d
+
+# Combine all necessary flags and optional flags.
+# Add target processor to flags.
+ALL_CFLAGS  = -mcpu=$(MCU) $(THUMB_IW) -I. $(CFLAGS) $(GENDEPFLAGS)
+ALL_ASFLAGS = -mcpu=$(MCU) $(THUMB_IW) -I. -x assembler-with-cpp $(ASFLAGS)
+
+
+# Default target.
+all: begin sizebefore build sizeafter finished end
+
+ifeq ($(FORMAT),ihex)
+build: elf hex lss sym
+hex: $(TARGET).hex
+else 
+ifeq ($(FORMAT),binary)
+build: elf bin lss sym
+bin: $(TARGET).bin
+else 
+$(error "$(MSG_FORMATERROR) $(FORMAT)")
+endif
+endif
+
+elf: $(TARGET).elf
+lss: $(TARGET).lss 
+sym: $(TARGET).sym
+
+# Eye candy.
+begin:
+	@echo
+	@echo $(MSG_BEGIN)
+
+finished:
+	@echo $(MSG_ERRORS_NONE)
+
+end:
+	@echo $(MSG_END)
+	@echo
+
+
+# Display size of file.
+HEXSIZE = $(SIZE) --target=$(FORMAT) $(TARGET).hex
+ELFSIZE = $(SIZE) -A $(TARGET).elf
+sizebefore:
+	@if [ -f $(TARGET).elf ]; then echo; echo $(MSG_SIZE_BEFORE); $(ELFSIZE); echo; fi
+
+sizeafter:
+	@if [ -f $(TARGET).elf ]; then echo; echo $(MSG_SIZE_AFTER); $(ELFSIZE); echo; fi
+
+# Create final output files (.hex, .eep) from ELF output file.
+# TODO: handle an .eeprom-section but should be redundant
+%.hex: %.elf
+	@echo
+	@echo $(MSG_FLASH) $@
+	$(OBJCOPY) -O $(FORMAT) $< $@
+	rm version.h       # jmfriedt : prepare pour la prochaine compilation
+	
+# Create final output file (.bin) from ELF output file.
+%.bin: %.elf
+	@echo
+	@echo $(MSG_FLASH) $@
+	$(OBJCOPY) -O $(FORMAT) $< $@
+
+
+# Create extended listing file from ELF output file.
+# testing: option -C
+%.lss: %.elf
+	@echo
+	@echo $(MSG_EXTENDED_LISTING) $@
+	$(OBJDUMP) -h -S -C $< > $@
+
+
+# Create a symbol table from ELF output file.
+%.sym: %.elf
+	@echo
+	@echo $(MSG_SYMBOL_TABLE) $@
+	$(NM) -n $< > $@
+
+
+# Link: create ELF output file from object files.
+.SECONDARY : $(TARGET).elf
+.PRECIOUS : $(AOBJARM) $(AOBJ) $(COBJARM) $(COBJ) $(CPPOBJ) $(CPPOBJARM)
+%.elf:  $(AOBJARM) $(AOBJ) $(COBJARM) $(COBJ) $(CPPOBJ) $(CPPOBJARM)
+	@echo
+	@echo $(MSG_LINKING) $@
+	$(CC) $(THUMB) $(ALL_CFLAGS) $(AOBJARM) $(AOBJ) $(COBJARM) $(COBJ) $(CPPOBJ) $(CPPOBJARM) --output $@ $(LDFLAGS)
+#	$(CPP) $(THUMB) $(ALL_CFLAGS) $(AOBJARM) $(AOBJ) $(COBJARM) $(COBJ) $(CPPOBJ) $(CPPOBJARM) --output $@ $(LDFLAGS)
+
+# Compile: create object files from C source files. ARM/Thumb
+$(COBJ) : %.o : %.c version.h
+	@echo
+	@echo $(MSG_COMPILING) $<
+	$(CC) -c $(THUMB) $(ALL_CFLAGS) $(CONLYFLAGS) $< -o $@ 
+
+# Compile: create object files from C source files. ARM-only
+$(COBJARM) : %.o : %.c version.h
+	@echo
+	@echo $(MSG_COMPILING_ARM) $<
+	$(CC) -c $(ALL_CFLAGS) $(CONLYFLAGS) $< -o $@ 
+
+# Compile: create object files from C++ source files. ARM/Thumb
+$(CPPOBJ) : %.o : %.cpp
+	@echo
+	@echo $(MSG_COMPILINGCPP) $<
+	$(CPP) -c $(THUMB) $(ALL_CFLAGS) $(CPPFLAGS) $< -o $@ 
+
+# Compile: create object files from C++ source files. ARM-only
+$(CPPOBJARM) : %.o : %.cpp
+	@echo
+	@echo $(MSG_COMPILINGCPP_ARM) $<
+	$(CPP) -c $(ALL_CFLAGS) $(CPPFLAGS) $< -o $@ 
+
+
+# Assemble: create object files from assembler source files. ARM/Thumb
+$(AOBJ) : %.o : %.S
+	@echo
+	@echo $(MSG_ASSEMBLING) $<
+	$(CC) -c $(THUMB) $(ALL_ASFLAGS) $< -o $@
+
+
+# Assemble: create object files from assembler source files. ARM-only
+$(AOBJARM) : %.o : %.S
+	@echo
+	@echo $(MSG_ASSEMBLING_ARM) $<
+	$(CC) -c $(ALL_ASFLAGS) $< -o $@
+
+
+# Target: clean project.
+clean: 
+	\rm *.o *.elf *.lst *.hex *.map *.lss *.d *.lst *.sym *.plg freemodbus-v1.5.0senseor/*/*/*.o racine/*.o freemodbus-v1.5.0senseor/*/*/*.lst freemodbus-v1.5.0senseor/*/*/*.d
+
+version.h:
+	echo "#define VERSION \"ver. 0." `svnversion`WRC\" > version.h
+
+flash: 
+	aducloader --ttyfile=/dev/ttyUSB0 --ihexfile=DDS.hex --baudrate=115200

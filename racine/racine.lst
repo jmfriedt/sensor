@@ -1,0 +1,62 @@
+   1              		.cpu arm7tdmi
+   2              		.eabi_attribute 20, 1
+   3              		.eabi_attribute 21, 1
+   4              		.eabi_attribute 23, 3
+   5              		.eabi_attribute 24, 1
+   6              		.eabi_attribute 25, 1
+   7              		.eabi_attribute 26, 1
+   8              		.eabi_attribute 30, 4
+   9              		.eabi_attribute 34, 0
+  10              		.eabi_attribute 18, 4
+  11              		.file	"racine.c"
+  12              		.text
+  13              		.global	__aeabi_idiv
+  14              		.align	2
+  15              		.global	jm_sqrt
+  16              		.arch armv4t
+  17              		.syntax unified
+  18              		.arm
+  19              		.fpu softvfp
+  21              	jm_sqrt:
+  22              		@ Function supports interworking.
+  23              		@ args = 0, pretend = 0, frame = 0
+  24              		@ frame_needed = 1, uses_anonymous_args = 0
+  25 0000 30482DE9 		push	{r4, r5, fp, lr}
+  26 0004 004050E2 		subs	r4, r0, #0
+  27 0008 0CB08DE2 		add	fp, sp, #12
+  28 000c 0200000A 		beq	.L2
+  29 0010 010054E3 		cmp	r4, #1
+  30 0014 C450A011 		asrne	r5, r4, #1
+  31 0018 0400001A 		bne	.L3
+  32              	.L2:
+  33 001c 0400A0E1 		mov	r0, r4
+  34 0020 0CD04BE2 		sub	sp, fp, #12
+  35              		@ sp needed
+  36 0024 3048BDE8 		pop	{r4, r5, fp, lr}
+  37 0028 1EFF2FE1 		bx	lr
+  38              	.L5:
+  39 002c 0350A0E1 		mov	r5, r3
+  40              	.L3:
+  41 0030 000055E3 		cmp	r5, #0
+  42 0034 0900000A 		beq	.L4
+  43 0038 0510A0E1 		mov	r1, r5
+  44 003c 0400A0E1 		mov	r0, r4
+  45 0040 FEFFFFEB 		bl	__aeabi_idiv
+  46 0044 050080E0 		add	r0, r0, r5
+  47 0048 C05045E0 		sub	r5, r5, r0, asr #1
+  48 004c 010055E3 		cmp	r5, #1
+  49 0050 C030A0E1 		asr	r3, r0, #1
+  50 0054 F4FFFFCA 		bgt	.L5
+  51 0058 0340A0E1 		mov	r4, r3
+  52 005c EEFFFFEA 		b	.L2
+  53              	.L4:
+  54 0060 0540A0E1 		mov	r4, r5
+  55 0064 ECFFFFEA 		b	.L2
+  57              		.ident	"GCC: (15:10.3-2021.07-4) 10.3.1 20210621 (release)"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 racine.c
+     /tmp/ccr8YKkW.s:14     .text:0000000000000000 $a
+     /tmp/ccr8YKkW.s:21     .text:0000000000000000 jm_sqrt
+
+UNDEFINED SYMBOLS
+__aeabi_idiv

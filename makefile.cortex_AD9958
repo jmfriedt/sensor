@@ -1,0 +1,76 @@
+# setup
+MAIN_OUT = DDS
+
+OBJS= DDS.o racine/racine.o DDSvar.o init_cortex.o init_cortex_AD9958.o ad8801.o syscalls.o # vector.o syscalls.o <- n'est plus necessaire si on linke avec libopencm3
+
+CC = arm-none-eabi-gcc
+CFLAGS  += -I./ -c -fno-common -O0 -g3 -Wall -Wextra -mcpu=cortex-m3 -mthumb -MD -DSTM32F1 
+CFLAGS += -I/home/jmfriedt/sat/arm-none-eabi/include/ -I./freemodbus-v1.5.0senseor/modbus/rtu/  -I./freemodbus-v1.5.0senseor/modbus/ascii/  -I./freemodbus-v1.5.0senseor/modbus/include/ -I./freemodbus-v1.5.0senseor/demo/ARM
+CFLAGS += -fno-common -mthumb -msoft-float
+CFLAGS += -Df400 -DAD9958  # specifique a l'application SENSeOR
+#CFLAGS += -fdump-rtl-expand
+
+#AS = arm-none-eabi-gcc
+#ASFLAGS = $(COMPILE_OPTS) -c
+#AFLAGS  = -ahls -mapcs-32 -o crt.o
+
+LD = arm-none-eabi-gcc
+LDFLAGS += -L ./libopencm3/lib/stm32/f1 -L /home/jmfriedt/eeepc/aduc/cortex/david_modbus/david/lib
+LDFLAGS += -lc -lnosys -T./stm32-h103.ld -nostartfiles # -T./stm32.ld
+LDFLAGS += -mthumb -march=armv7 -mfix-cortex-m3-ldrd -msoft-float
+LDFLAGS += -mcpu=cortex-m3
+
+OBJCP = arm-none-eabi-objcopy
+OBJCPFLAGS = -O binary
+
+AR = arm-none-eabi-ar
+ARFLAGS = cr
+
+MAIN_OUT_ELF = $(MAIN_OUT).elf
+MAIN_OUT_BIN = $(MAIN_OUT).bin
+
+# all
+all: $(MAIN_OUT_ELF) $(MAIN_OUT_BIN)
+
+# main
+OBJS +=stm32f10x_it.o
+
+ifeq ($(AVERAGE),1)
+OBJS += ./moyenne.o
+CFLAGS += -DAVERAGE
+endif
+
+ifeq ($(MODBUS),1)
+#OBJS += libmodbus-3.0.3/src/modbus.o libmodbus-3.0.3/src/modbus-data.o libmodbus-3.0.3/src/modbus-rtu.o
+OBJS +=  ./freemodbus-v1.5.0senseor/modbus/mb.o ./freemodbus-v1.5.0senseor/modbus/rtu/mbrtu.o \
+        ./freemodbus-v1.5.0senseor/modbus/rtu/mbcrc.o ./freemodbus-v1.5.0senseor/modbus/functions/mbfunccoils.o \
+        ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncdiag.o ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncholding.o \
+        ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncinput.o ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncother.o \
+        ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncdisc.o ./freemodbus-v1.5.0senseor/modbus/functions/mbutils.o \
+        ./freemodbus-v1.5.0senseor/demo/ARM/portevent.o ./freemodbus-v1.5.0senseor/modbus/ascii/mbascii.o 
+CFLAGS += -DMODBUS
+endif
+
+$(MAIN_OUT_ELF): version.h $(OBJS) DDSinc.h DDSvar.h
+	@ echo "..linking"
+	$(LD) $(LDFLAGS) $(OBJS) --output $@ -lstm32 # -lopencm3_stm32f1 -lstm32 -lcmsis
+
+$(MAIN_OUT_BIN): $(MAIN_OUT_ELF)
+	$(OBJCP) $(OBJCPFLAGS) $< $@
+	rm version.h
+
+$(MAIN_OUT_HEX): $(MAIN_OUT_ELF)
+	$(OBJCP) -Oihex $< $@
+
+clean:
+	-rm *.o $(MAIN_OUT_ELF) $(MAIN_OUT_BIN) freemodbus-v1.5.0senseor/*/*/*.o *.lst *.d racine/*.o
+	-rm *.elf.*
+install: all
+	stm32flash.sh -w $(MAIN_OUT).bin /dev/ttyUSB0
+
+version.h:
+	echo "#define VERSION \"ver. 0." `svnversion`WRC\" > version.h
+
+flash:
+	stm32flash.sh -w $(MAIN_OUT).bin /dev/ttyUSB0
+

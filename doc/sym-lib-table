@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name new_sawtag_2012-eagle-import)(type Legacy)(uri ${KIPRJMOD}/new_sawtag_2012-eagle-import.lib)(options "")(descr ""))
+)

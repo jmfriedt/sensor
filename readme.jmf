@@ -1,0 +1,58 @@
+ajout de CFLAGS=-fdump-rtl-expand
+egypt DDS.c.150r.expand | dotty -
+
+-------------------------------------
+
+tefal = avec detectous
+schrad= sans detectous
+
+From: Jean-Michel FRIEDT <jean-michel.friedt@femto-st.fr>
+To: Cédric GRINDA <cedric.grinda@senseor.com>
+Subject: Re: Firmware
+Date: Mon, 30 May 2011 15:03:32 +0200
+User-Agent: Internet Messaging Program (IMP) H3 (4.3.7)
+
+> -          #undef compte_tour  
+
+manip mfpm : on peut installer un relais reed sur une broche (PA0 de tete)
+qui permet de compter la vitesse de la roue. N'a jamais servi autre part que
+sur mon velo
+
+> -          #define at25  
+
+voir at25.c : ajout d'une memoire flash externe sur le port 2x6 broches
+des nouveaux interrogateurs grande taille pour conserver la configuration
+definie par +++AT (l'ecriture se fait par ATW, et la config est lue
+automatiquement a l'allumage si la flash est presente)
+
+Devrait devenir obsolete depuis que david m'a montre' qu'on peut faire la
+meme chose directement dans l'aduc7026, mais l'AT25 a 4 Mb de memoire donc
+pourrait aussi servir a sauver les trames
+
+> -          Int bandes=1 (peux tu me donner un exemple pour bandes =0 ou
+> bandes=2) ?  
+
+bandes est binaire : soit c'est 1 (on a defini des bandes de frequences), soit
+c'est 0 (on ne sait pas a l'avance ou` se trouve la resonance, notamment
+parceque chaque resonance ne reste pas dans sa sous-bande predefinie). A
+servi pour Snecma (cryo) et les capteurs de pression schrader, mais a
+tester si encore fonctionnel, parfois ca donnait des resultats douteux. En
+resume, ca doit permettre de s'affranchir de bandes predefinies.
+
+> -          #define f400  
+
+SAWHOT : comme ne peut plus avoir de PLL avec lesquelles on genere le 400 MHz,
+je cadence le DDS a 400 MHz, et naturellement il sort 400+f0 MHz (avec f0
+la frequence programmee dans le DDS). A terme, devrait etre exploitable tout
+le temps, mais la raie a 400+f0 MHz est bien plus faible que la sortie du
+melange PLL+DDS, et du coup je dois souder un ampli additionnel + filtre
+passe bande en sortie du DDS, c'est pas tres beau.
+
+> -          #define LMD  
+
+hygrometre polytechnique : ils voulaient des trames de largeur predefinie
+et epurees pour traitement automatique par un microcontroleur charge' de
+la mise en forme pour la balise radio du CNES + une forme de Bode facile
+a traiter sur requete + envoi de trame que s'ils appuient sur 'a', et pas
+de message sinon (la bande passante du radiomodem du cnes etant limitee).
+

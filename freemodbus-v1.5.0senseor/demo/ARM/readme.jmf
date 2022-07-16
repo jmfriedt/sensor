@@ -1,0 +1,7 @@
+Exemple teste' sur lecteur gilloux avec un STM32F103 :
+1/ flasher demo.bin qui boucle sur la fonction poll de Modbus en
+faisant clignoter une diode
+2/ lancer demo_DAT3024_sur_pc sur PC (liaison USB) qui communique
+en modbus, validation des transactions bidirectionnelles, lecture
+des valeurs initiales depuis un registre, ecriture dans un registre
+et relecture de la valeur qui y a ete stockee.

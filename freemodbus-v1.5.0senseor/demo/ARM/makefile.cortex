@@ -1,0 +1,182 @@
+#
+# FreeModbus MSP430 port Makefile
+#
+# Copyright (c) 2006 Christian Walter, Vienna 2006.
+#
+# $Id: Makefile,v 1.3 2007/06/12 06:42:01 wolti Exp $
+#
+# ---------------------------------------------------------------------------
+
+STARTUP_DIR=$(CORTEX_BASE_DIR)/startup/stm32
+
+BASE        = /usr/
+CC	    = arm-none-eabi-gcc
+LD          = arm-none-eabi-ld
+CXX	    = arm-none-eabi-g++
+OBJCOPY	    = arm-none-eabi-objcopy
+SIZE	    = arm-none-eabi-size
+
+MCU      = cortex-m3
+MB_INC      = -I../../modbus/rtu/  -I../../modbus/ascii/ \
+              -I../../modbus/include/ -I include/
+ASFLAGS     = -MD -g -mmcu=$(MCU)
+LDFLAGS     = -g -mmcu=$(MCU)
+TGT         = demo
+
+MB_SRC      = $(addprefix ../../modbus/, mb.c )
+MB_RTU_SRC  = $(addprefix ../../modbus/rtu/, mbrtu.c mbcrc.c )
+MB_ASCII_SRC= $(addprefix ../../modbus/ascii/, mbascii.c )
+MB_FUNC_SRC = $(addprefix ../../modbus/functions/, mbfunccoils.c \
+              mbfuncdiag.c mbfuncholding.c mbfuncinput.c mbfuncother.c \
+              mbfuncdisc.c mbutils.c) 
+PORT_SRC    = $(addprefix ./, init_cortex.c DDSvar.c portevent.c init_cortex_AD9958.c stm32f10x_it.c)
+#OBJS =  ./freemodbus-v1.5.0senseor/modbus/mb.o ./freemodbus-v1.5.0senseor/modbus/rtu/mbrtu.o \
+#        ./freemodbus-v1.5.0senseor/modbus/rtu/mbcrc.o ./freemodbus-v1.5.0senseor/modbus/functions/mbfunccoils.o \
+#        ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncdiag.o ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncholding.o \
+#        ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncinput.o ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncother.o \
+#        ./freemodbus-v1.5.0senseor/modbus/functions/mbfuncdisc.o ./freemodbus-v1.5.0senseor/modbus/functions/mbutils.o \
+#        ./freemodbus-v1.5.0senseor/demo/ARM/portevent.o ./freemodbus-v1.5.0senseor/modbus/ascii/mbascii.o 
+
+CSRC        = demo.c \
+              $(MB_SRC) $(MB_RTU_SRC) $(MB_ASCII_SRC) $(MB_FUNC_SRC) \
+              $(PORT_SRC)
+ASRC        = 
+
+OBJS        = $(CSRC:.c=.o) $(ASRC:.S=.o)
+DEPS        = $(OBJS:.o=.d)
+BIN         = $(TGT).elf
+
+.PHONY: clean all
+
+all: $(BIN)
+
+$(BIN): $(OBJS)
+	$(CC) $(OBJS) $(LDLIBS) -o $@  $(LDFLAGS)
+	$(OBJCOPY) -O ihex $@ demo.hex
+ 
+clean:
+	rm -f $(DEPS)
+	rm -f $(OBJS)
+	rm -f $(BIN) $(TGT).map 	
+	rm *.lst
+
+# ---------------------------------------------------------------------------
+# rules for code generation
+# ---------------------------------------------------------------------------
+%.o:    %.c
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+%.o:    %.S
+	$(CC) $(ASFLAGS) -o $@ -c $<
+
+# ---------------------------------------------------------------------------
+#  # compiler generated dependencies
+# ---------------------------------------------------------------------------
+-include $(DEPS)
+
+## Output format. (can be ihex or binary)
+FORMAT = binary 
+
+# Optimization level, can be [0, 1, 2, 3, s]. 
+# 0 = turn off optimization. s = optimize for size.
+# (Note: 3 is not always the best optimization level. See avr-libc FAQ.)
+OPT = 1
+#OPT = 3
+
+# List any extra directories to look for include files here.
+EXTRAINCDIRS = ./include
+
+# List any extra directories to look for library files here.
+EXTRA_LIBDIRS = 
+
+
+# Compiler flag to set the C Standard level.
+# gnu99 - c99 plus GCC extensions
+CSTANDARD = -std=gnu99
+
+# Place -I options here
+CINCS = -I. 
+
+# Place -D or -U options for ASM here
+ADEFS =  -D$(RUN_MODE)
+
+ifdef VECTOR_LOCATION
+CDEFS += -D$(VECTOR_LOCATION)
+ADEFS += -D$(VECTOR_LOCATION)
+endif
+
+# Compiler flags.
+#  -g*:          generate debugging information
+#  -O*:          optimization level
+#  -f...:        tuning, see GCC manual and avr-libc documentation
+#  -Wall...:     warning level
+#  -Wa,...:      tell GCC to pass this to the assembler.
+#    -adhlns...: create assembler listing
+#
+# Flags for C and C++ (arm-elf-gcc/arm-elf-g++)
+CFLAGS  = -mcpu=$(MCU) $(THUMB_IW) -I. $(GENDEPFLAGS) $(MB_INC)
+CFLAGS += $(CDEFS) $(CINCS)
+CFLAGS += -O$(OPT)
+CFLAGS += -Wall -Wcast-align -Wimplicit 
+CFLAGS += -Wpointer-arith -Wswitch
+CFLAGS += -Wredundant-decls -Wreturn-type -Wshadow -Wunused
+CFLAGS += -Wa,-adhlns=$(subst $(suffix $<),.lst,$<) 
+CFLAGS += $(patsubst %,-I%,$(EXTRAINCDIRS))
+
+###################### vient du cortex
+CFLAGS += -I./ -c -fno-common -O0 -g3 -Wall -Wextra -mcpu=cortex-m3 -mthumb -MD -DSTM32F1
+CFLAGS += -I/home/jmfriedt/enseignement/ufr/platforms/stm32/F4/libopencm3/include -I$(STM32_INC)/include -I./freemodbus-v1.5.0senseor/modbus/rtu/  -I./freemodbus-v1.5.0senseor/modbus/ascii/  -I./freemodbus-v1.5.0senseor/modbus/include/ -I./freemodbus-v1.5.0senseor/demo/ARM
+CFLAGS += -DMODBUS -Daduc
+CFLAGS += -fno-common -mthumb -msoft-float
+###################### vient du cortex
+
+# flags only for C
+CONLYFLAGS += -Wnested-externs 
+CONLYFLAGS += $(CSTANDARD)
+
+CFLAGS += -Wcast-qual -fno-omit-frame-pointer
+CONLYFLAGS += -Wmissing-prototypes 
+CONLYFLAGS += -Wstrict-prototypes
+CONLYFLAGS += -Wmissing-declarations
+
+CPPFLAGS = 
+
+# Assembler flags.
+#  -ahlms:    create listing
+ASFLAGS = $(ADEFS) -Wa,-adhlns=$(<:.S=.lst)
+
+# Extra libraries
+EXTRA_LIBS =
+
+MATH_LIB = 
+
+# Linker flags.
+#  -Wl,...:     tell GCC to pass this to linker.
+#    -Map:      create map file
+#    --cref:    add cross reference to  map file
+
+LDFLAGS = -nostartfiles -Wl,-Map=$(TARGET).map,--cref
+
+LDFLAGS += $(NEWLIBLPC) $(MATH_LIB)
+LDFLAGS += $(CPLUSPLUS_LIB)
+LDFLAGS += $(patsubst %,-L%,$(EXTRA_LIBDIRS))
+LDFLAGS += $(patsubst %,-l%,$(EXTRA_LIBS))
+
+###################### vient du cortex
+LDFLAGS += -L$(STM32_LIB)/thumb/cortex-m3
+LDFLAGS +=-L$(STARTUP_DIR)
+LDFLAGS += -lc -lnosys -T./stm32-h103.ld -nostartfiles # -T./stm32.ld
+LDFLAGS += -mthumb -march=armv7 -mfix-cortex-m3-ldrd -msoft-float
+###################### vient du cortex
+
+# Set Linker-Script Depending On Selected Memory and Controller
+LDFLAGS +=-Wall -Wcast-align -Wimplicit  -Wpointer-arith -Wswitch -Wredundant-decls -Wreturn-type -Wshadow -Wunused -Wa,-adhlns=startup.lst -Wcast-qual -fno-omit-frame-pointer -nostartfiles -Wl,-Map=modbus.map,--cref
+LDFLAGS += -lopencm3_stm32f1 
+LDFLAGS +=-lstm32 -lcmsis
+
+# Combine all necessary flags and optional flags.
+# Add target processor to flags.
+ASFLAGS += -mcpu=$(MCU) $(THUMB_IW) -I. -x assembler-with-cpp
+
+version.h:
+	echo "#define VERSION \"ver. 0." `svnversion`WRC\" > version.h

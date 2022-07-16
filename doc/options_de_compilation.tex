@@ -1,0 +1,110 @@
+\documentclass[a4paper]{article}
+\usepackage[french]{babel}
+\usepackage{fullpage,graphicx}
+\begin{document}
+\begin{center}
+{\Large\bf Compilation du firmware interrogateurs sans fil} \\
+\today, J.-M Friedt
+\end{center}
+
+\section{Versions de lecteurs}
+
+Le logiciel embarqu\'e est d\'esormais compatible avec 3 types d'interrogateurs afin
+de mutualiser la partie algorithmique du code ({\tt DDS.c}) et de ne faire appel
+qu'\`a quelques fonctions sp\'ecfiques au mat\'eriel de chaque plateforme mat\'erielle~:
+\begin{enumerate}
+\item les lecteurs classique et Schrader exploitent le microcontr\^oleur ADuC7026 et le DDS AD9954. Une
+variante est la PLL du lecteur classique qui a \'et\'e modifi\'ee en novembre 2012 mais n'impose qu'une option 
+additionnelle,
+\item le lecteur gilloux bas\'e sur un DDS AD9958 et un microcontr\^oleur STM32 Cortex M3,
+\item le lecteur low cost bas\'e sur un STM32 Cortex M3 et un radiomodem Semtech XE1203F
+\end{enumerate}
+
+\section{Variables d'environnement et outils de compilation}
+
+Il est peu judicieux de d\'eplacer des versions obsol\`etes de {\tt libstm32} avec les divers
+codes sources de logiciels embarqu\'es. Le choix a \'et\'e fait, en vue de permettre l'utilisation
+de fonctions gourmandes en ressources que sont l'allocation dynamique de m\'emoire ({\tt malloc()})
+et le calcul en virgule flottante ({\tt double}), de se lier avec la derni\`ere version de {\tt libstm32}
+disponible sur {\tt summon-arm-toolchain}. Pour ce faire, les variables d'environnement suivantes sont
+n\'ecessaires
+
+\begin{verbatim}
+export CORTEX_BASE_DIR=${HOME}/sat/
+export STM32_INC=${CORTEX_BASE_DIR}/include
+export STM32_LIB=${CORTEX_BASE_DIR}/lib
+export PATH=${HOME}/sat/bin:$PATH
+\end{verbatim}
+
+\section{{\tt Makefile}}
+
+D'un point de vue compilateur, le choix de la cha\^\i ne de compilation et des options pour le
+processeur associ\'e sont d\'efinis dans {\tt Makefile}. L'utilisateur n'a, {\em a priori}, jamais
+\`a toucher aux configurations de compilation incluses ({\tt makefile.*}). Trois options sont
+disponibles dans {\tt Makefile} pour les trois architectures cit\'ees ci-dessus~:
+\begin{enumerate}
+\item {\tt include makefile.aduc} pour les lecteurs classique et Schrader,
+\item {\tt include makefile.cortex\_AD9958} pour le lecteur gilloux,
+\item {\tt include makefile.cortex\_XE1203} pour le lecteur low cost,
+\item {\tt include makefile.pc} est une option additionnelle qui permet de tester sur PC (ie sans 
+mat\'eriel embarqu\'e d\'edi\'e) les algorithmes de commande. L'int\'er\^et de cette approche
+est de pouvoir synth\'etiser des signaux respectant certaines statistiques de bruit et de
+valider par des tests automatiques le fonctionnement de la partie algorithmique du firmware ({\tt DDS.c}).
+Ces signaux sont synth\'etis\'es dans {\tt dummy\_pc.c}, dans la fonction interroge qui renvoie un
+puissance fonction de la fr\'equence sond\'ee (faisant appel aux registres FTW0, cette m\'ethode de
+d\'eveloppement n'est pas fonctionnelle pour le moment pour le low cost et n'a \'et\'e test\'ee que
+pour le lecteur classique). Le binaire r\'esultant, {\tt interrogateur}, est en g\'en\'eral ex\'ecut\'e
+dans la console en mode texte, l'affichage dans un {\tt xterm} induisant un saut de ligne entre
+les trames.
+\end{enumerate}
+
+Une seule de ces options ne peut \^etre active lors d'une compilation donn\'ee, les autres options
+doivent \^etre comment\'ees en pr\'ec\'dent la ligne d'un symbole \#.
+
+Par ailleurs, deux variables de compilation sont d\'efinies (=1) ou non (=0) dans le {\tt Makefile}
+pour activer l'affichage sur \'ecran LCD (uniquement test\'e sur lecteur Schrader) ou pour
+activer la communication sur bus MOSBUS (uniquement test\'e sur interrogateurs classique et Schrader
+pour une plateforme autour de l'ADuC7026 -- le portage au Cortex M3 n'a pas \'et\'e valid\'ee dans tous
+les cas et notamment si le lecteur est serveur). Ces options sont par d\'efaut {\tt MODBUS = 0} et
+{\tt LCD    = 0}.
+
+\section{Configurations}
+
+La configuration logicielle doit refl\'eter les besoins du mat\'eriel. Nous d\'eclinons de nouveau
+les options sp\'ecifiques \`a chaque mat\'eriel dans les options propos\'ees dans le fichier
+{\tt DDSinc.h} qui d\'epend des architectures~:
+\begin{enumerate}
+\item pour les lecteurs classique et Schrader, le c\oe eur du DDS est cadenc\'e \`a 200~MHz ({\tt \#undef f400}),
+la PLL est s\'electionn\'ee en fonction de la date de fabrication du lecteur ({\tt \#undef ADF4111} pour
+pr\'e-Novembre 2012, {\tt \#define ADF4111} sinon) et le DDS est un AD9954 (donc {\tt \#undef AD9958}),
+\item pour le lecteur gilloux, le c\oe eur du DDS est cadenc\'e \`a 360~MHz ({\tt \#define f400}), il
+n'y a pas de PLL donc l'option {\tt ADF4111} est sans importance, et le DDS est un AD9958 (donc {\tt \#define AD9958}),
+\item pour le low cost, malgr\'e l'absence de DDS nous consid\'erons qu'il est peu judicieux d'activer l'option
+{\tt AD9958} et dans le doute afficherons un message d'erreur si cette configuration est active. Par ailleurs, la
+fr\'equence est suppos\'ee d\'efinie comme si une horloge caden\c cant le DDS \`a 200~MHz existait, donc il
+faut {\tt \#undef f400}.
+\end{enumerate}
+
+Le fichier {\tt DDSinc.h} d\'efinit les options de compilation tandis que les variables susceptibles d'\^etre
+modifi\'ees par l'utilisateur (dans la fonction {\tt communication()} de {\tt DDS.c}) sont initialis\'ees avec
+des valeurs par d\'efaut dans {\tt DDSvar.c}. On y trouvera donc les bornes de fr\'equences, nombre de r\'esonances
+et nombre de points de mesure, configuration des fr\'equences par intervalles de tailles \'egales ou manuels ...
+
+On pr\'ef\`erera d\'esactiver la d\'efinition d'une constante en la commentant plut\^ot que par l'utilisation
+de {\tt \#undef} puisque certaines options de compilation sont pass\'ees depuis la ligne de commande au compilateur
+par l'option {\tt -D} et risquent d'\^etre d\'esactiv\'ees si un {\tt \#undef} est utilis\'e.
+
+\section{Simulateur sur PC}
+
+Le simulateur d'interrogateur sur PC est un outil pour d\'everminer les problemes d'affichage (d\'epassement de
+capacit\'e) et d'immunit\'e au bruit. Le fichier {\tt dummy\_pc.c} contient les fonctions qui \'emulent
+les r\'eponses des composants mat\'eriels des interrogateurs. En tant que tel, un double-r\'esonateur est simul\'e (sous forme de
+r\'eponse somme de deux gaussiennes) dans la fontion {\tt interroge()} qui renvoie une information de puissance en 
+fonction de la fr\'equence \'emise par le DDS. Cet outil semble particuli\`erement appropri\'e pour simuler une mesure
+bruit\'ee, pour le moment avec une contribution de bruit blanc sur l'amplitude mais qui pourrait \^etre enrichie de
+diverses statistiques de bruit si besoin est.
+
+Le simulateur doit \^etre ex\'ecut\'e depuis une console en mode texte sous GNU/Linux puisque la gestion du clavier
+ne semble pas appropri\'ee pour l'environnement graphique X11.
+
+\end{document}

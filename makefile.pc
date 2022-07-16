@@ -1,0 +1,22 @@
+all: interrogateur
+
+interrogateur: dummy_pc.o DDS.o DDSvar.o racine.o version.h
+	gcc -Wall -o interrogateur dummy_pc.o DDS.o DDSvar.o racine.o -lm
+
+DDSvar.o: DDSvar.c
+	gcc -Wall -I. -c DDSvar.c
+
+dummy_pc.o: dummy_pc.c version.h
+	gcc -Wall -I. -c dummy_pc.c
+
+DDS.o: DDS.c version.h
+	gcc -Wall -I. -c DDS.c
+
+clean:
+	rm *.o version.h
+
+version.h:
+	echo "#define VERSION \"ver. 0." `svnversion`WRC\" > version.h
+
+racine.o: racine/racine.c
+	gcc -Wall -I. -c racine/racine.c
